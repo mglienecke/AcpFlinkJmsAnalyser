@@ -1,0 +1,23 @@
+spring:
+  application:
+    name: flink-jms-analyzer
+  
+  activemq:
+    broker-url: tcp://localhost:61616
+    user: admin
+    password: admin
+    packages:
+      trust-all: true
+
+app:
+  jms:
+    input-queue: input.queue
+  
+  flink:
+    queue-capacity: 10000
+
+logging:
+  level:
+    root: INFO
+    com.example.flinkjms: DEBUG
+    org.apache.flink: INFO
