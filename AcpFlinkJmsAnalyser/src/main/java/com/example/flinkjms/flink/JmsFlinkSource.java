@@ -24,10 +24,11 @@ public class JmsFlinkSource implements SourceFunction<MessageItem> {
     @Override
     public void run(SourceContext<MessageItem> ctx) throws Exception {
         logger.info("JmsFlinkSource started");
-        
+
         while (running) {
             try {
                 MessageItem item = queue.take();
+                logger.debug("Received item from queue: id={}, value={}", item.getId(), item.getValue());
                 ctx.collect(item);
             } catch (InterruptedException e) {
                 if (running) {
@@ -36,7 +37,7 @@ public class JmsFlinkSource implements SourceFunction<MessageItem> {
                 Thread.currentThread().interrupt();
             }
         }
-        
+
         logger.info("JmsFlinkSource stopped");
     }
 

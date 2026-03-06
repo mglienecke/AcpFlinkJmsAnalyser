@@ -1,14 +1,20 @@
 package com.example.flinkjms.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
 import java.io.Serializable;
 import java.time.Instant;
 
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@ToString
 public class MessageItem implements Serializable {
+
+    private static final long serialVersionUID = 1L;
     
     @JsonProperty("id")
     private String id;
@@ -21,57 +27,19 @@ public class MessageItem implements Serializable {
     
     @JsonProperty("metadata")
     private String metadata;
-    
-    public String getId() {
-        return id;
-    }
 
-    public void setId(String id) {
-        this.id = id;
-    }
-
-    public Double getValue() {
-        return value;
-    }
-
-    public void setValue(Double value) {
-        this.value = value;
-    }
-
-    public Long getTimestamp() {
-        return timestamp;
-    }
-
-    public void setTimestamp(Long timestamp) {
-        this.timestamp = timestamp;
-    }
-
-    public String getMetadata() {
-        return metadata;
-    }
-
-    public void setMetadata(String metadata) {
-        this.metadata = metadata;
-    }
-
+    @JsonIgnore
     public Instant getInstant() {
         return timestamp != null ? Instant.ofEpochMilli(timestamp) : Instant.now();
     }
-    
+
+    @JsonIgnore
     public boolean isValid() {
         return value != null && value <= 100;
     }
-    
+
+    @JsonIgnore
     public boolean isError() {
         return value != null && value > 100;
-    }
-
-    public MessageItem() {}
-
-    public MessageItem(String id, Double value, Long timestamp, String metadata) {
-        this.id = id;
-        this.value = value;
-        this.timestamp = timestamp;
-        this.metadata = metadata;
     }
 }

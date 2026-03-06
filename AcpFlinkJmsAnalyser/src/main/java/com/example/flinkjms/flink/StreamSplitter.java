@@ -21,15 +21,18 @@ public class StreamSplitter extends ProcessFunction<MessageItem, MessageItem> {
 
     @Override
     public void processElement(MessageItem item, Context ctx, Collector<MessageItem> out) {
+        logger.info("StreamSplitter processing item: id={}, value={}", item.getId(), item.getValue());
+
         if (item.getValue() == null) {
             logger.warn("Received item with null value: {}", item.getId());
             ctx.output(errorTag, item);
         } else if (item.isError()) {
             // value > 100, send to error stream
-            logger.debug("Item {} has invalid value: {}", item.getId(), item.getValue());
+            logger.info("Item {} has invalid value: {} - sending to ERROR stream", item.getId(), item.getValue());
             ctx.output(errorTag, item);
         } else {
             // value <= 100, send to good stream
+            logger.info("Item {} has valid value: {} - sending to GOOD stream", item.getId(), item.getValue());
             out.collect(item);
         }
     }

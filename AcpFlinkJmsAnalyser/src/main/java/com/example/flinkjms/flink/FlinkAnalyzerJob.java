@@ -33,10 +33,12 @@ public class FlinkAnalyzerJob {
     public FlinkAnalyzerJob(BlockingQueue<MessageItem> messageQueue) {
         this.messageQueue = messageQueue;
         this.env = StreamExecutionEnvironment.getExecutionEnvironment();
-        
-        // Configure environment
-        env.setParallelism(4);
+
+        // Configure environment - use parallelism 1 for simpler debugging
+        env.setParallelism(1);
         env.getConfig().setAutoWatermarkInterval(1000);
+
+        logger.info("Flink environment configured: parallelism=1, watermark interval=1000ms");
     }
 
     public void start() throws Exception {
@@ -45,32 +47,56 @@ public class FlinkAnalyzerJob {
         // Create source from JMS queue
         DataStream<MessageItem> source = env
                 .addSource(new JmsFlinkSource(messageQueue))
-                .name("JMS Source");
+                .name("JMS Source")
+                .map(item -> {
+                    logger.info("Source emitted: {}", item);
+                    return item;
+                });
 
-        // Assign timestamps and watermarks
+        // Assign timestamps and watermarks with idle timeout to allow watermarks to advance
         DataStream<MessageItem> timestamped = source
                 .assignTimestampsAndWatermarks(
                         WatermarkStrategy
-                                .<MessageItem>forBoundedOutOfOrderness(Duration.ofSeconds(5))
-                                .withTimestampAssigner((item, timestamp) -> item.getInstant().toEpochMilli())
+                                .<MessageItem>forBoundedOutOfOrderness(Duration.ofSeconds(2))
+                                .withTimestampAssigner((item, timestamp) -> {
+                                    long ts = item.getInstant().toEpochMilli();
+                                    logger.info("Assigning timestamp {} to item {}", ts, item.getId());
+                                    return ts;
+                                })
+                                .withIdleness(Duration.ofSeconds(5))
                 )
-                .name("Assign Timestamps");
+                .name("Assign Timestamps")
+                .map(item -> {
+                    logger.info("After timestamp assignment: {}", item);
+                    return item;
+                });
 
         // Split stream into good and error streams
         SingleOutputStreamOperator<MessageItem> goodStream = timestamped
                 .process(new StreamSplitter(ERROR_TAG))
-                .name("Stream Splitter");
+                .name("Stream Splitter")
+                .map(item -> {
+                    logger.info("Good stream item: {}", item);
+                    return item;
+                });
 
         DataStream<MessageItem> errorStream = goodStream.getSideOutput(ERROR_TAG);
 
-        // Print error stream
+        // Print error stream IMMEDIATELY (no windowing)
         errorStream
-                .map(item -> String.format("ERROR: %s (value=%.2f)", item.getId(), item.getValue()))
+                .map(item -> String.format("ERROR: id=%s, value=%.2f, timestamp=%d",
+                        item.getId(), item.getValue(), item.getTimestamp()))
                 .print("Error Stream");
 
-        // Compute statistics on good stream with 1-minute tumbling windows
+        // Also print good stream immediately for debugging
+        goodStream
+                .map(item -> String.format("VALID: id=%s, value=%.2f, timestamp=%d",
+                        item.getId(), item.getValue(), item.getTimestamp()))
+                .print("Valid Stream");
+
+        // Compute statistics on good stream with 10-second tumbling windows (for faster results)
         DataStream<Statistics> statistics = goodStream
-                .windowAll(TumblingEventTimeWindows.of(Time.minutes(1)))
+                .windowAll(TumblingEventTimeWindows.of(Time.seconds(10)))
                 .aggregate(
                         new StatisticsAggregateFunction(),
                         new WindowMetadataProcessFunction()
@@ -79,9 +105,9 @@ public class FlinkAnalyzerJob {
 
         statistics.print("Statistics");
 
-        // Perform clustering on good stream with 2-minute tumbling windows
+        // Perform clustering on good stream with 20-second tumbling windows (for faster results)
         DataStream<List<ClusterResult>> clusters = goodStream
-                .windowAll(TumblingEventTimeWindows.of(Time.minutes(2)))
+                .windowAll(TumblingEventTimeWindows.of(Time.seconds(20)))
                 .aggregate(
                         new ClusteringAggregateFunction(),
                         new WindowMetadataProcessFunction<>()

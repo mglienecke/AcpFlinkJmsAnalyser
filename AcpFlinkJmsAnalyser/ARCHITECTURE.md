@@ -116,5 +116,4 @@ Cluster[id=2, centroid=75.80, items=35, samples=[stu, vwx, yza]]
 **Error Output** (immediate):
 ```
 ERROR: msg-003 (value=150.00)
-ERROR: msg-006 (value=-10.00)
 ```
